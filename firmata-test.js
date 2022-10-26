@@ -1,4 +1,8 @@
-async function connect() {
+let writer;
+let pin_io_array = new Uint8Array(39);
+let pin_direction_array = new Uint8Array(39);
+
+async function connect_serial() {
     console.log("cgtn");
     //Optional filter to only see relevant boards
     const filter1 = {
@@ -23,21 +27,12 @@ async function connect() {
         inputDone = port.readable.pipeTo(decoder.writable);
         inputStream = decoder.readable;
 
-        const encoder = new TextEncoderStream();
-        outputDone = encoder.readable.pipeTo(port.writable);
-        outputStream = encoder.writable;
-
+        //const encoder = new TextEncoderStream();
+        //outputDone = encoder.readable.pipeTo(port.writable);
+        //outputStream = encoder.writable;
+        writer = port.writable.getWriter();
         reader = inputStream.getReader();
-        var arrays = new Uint8Array(7);  
-        arrays[0] = 0xF0;
-        arrays[1] = 0xF5;
-        arrays[2] = 16;
-        arrays[3] = 1
-        arrays[4] = 0xF7;
-        arrays[5] = 0x0A;
-        arrays[6] = 0x0D;
-        writeToStream(arrays);
-        readLoop();
+      
     } catch (e) {
         //If the pipeTo error appears; clarify the problem by giving suggestions.
         if (e == "TypeError: Cannot read property 'pipeTo' of undefined") {
@@ -48,12 +43,41 @@ async function connect() {
 };
 
 async function writeToStream(line) {
-    const writer = outputStream.getWriter();
     writer.write(line);
-    console.log(line);
-    writer.releaseLock();
+   // console.log(line);
+    //writer.releaseLock();
 };
 
+function digitalWrite_fmt(pin, state){
+    var arrays = new Uint8Array(6);
+    let port_pin = Math.floor(pin/8);
+    arrays[0] = 0xF4;
+    arrays[1] = pin;
+    arrays[2] = 1;
+    arrays[3] = 0x90 + port_pin;
+    pin_io_array[pin] = state;
+
+    
+    let portVal = 0;
+    let j = 0;
+    for(let i = port_pin*8; i<=pin+7; i++){
+        console.log(i);
+         if(pin_io_array[i] == 1){
+            portVal |= (1<<j);
+         }else{
+            portVal &= ~(1<<j);
+         }
+         j++;
+    }
+    console.log(portVal.toString(2));
+    arrays[4] = portVal;
+    pin_io_array[(port_pin-1)*8+1]<<1 + pin_io_array[(port_pin-1)*8];
+    
+    arrays[5] = 0x00;
+
+    writeToStream(arrays); 
+    //readLoop();
+}
 
 async function readLoop(sendStr) {
     console.log("reading");
