@@ -188,6 +188,18 @@ function play_tone_fmt(note, beats){
     
 }
 
+function servo_write_fmt(pin, angle){
+    var arrays = new Uint8Array(6);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x08;
+    arrays[3] = note;
+    arrays[4] = beats;
+    arrays[5] = 0xF7;
+    writeToStream(arrays);
+    
+}
+
 //f4 10 01 f0 6f 10 ff 00 f7   
 //f4 10 03 f0 6f 10 32 00 f7
 
@@ -202,7 +214,7 @@ async function analog_read_fmt(pin) {
     writeToStream(arrays);
     let read_val = await readLoop(0)
     let value_dec = (read_val.charCodeAt(1)) + (read_val.charCodeAt(2) << 7);
-    console.log(value_dec);
+    //console.log(value_dec);
     return value_dec;
 }
 
@@ -215,40 +227,36 @@ async function temperature_read_fmt(pin) {
     arrays[4] = 0xF7;
     writeToStream(arrays);
     let read_val = await readLoop(2)
-    //console.log(read_val.charCodeAt(0) + " " + read_val.charCodeAt(1) + " " + read_val.charCodeAt(3)); //add check to validate port
-    for(let i=0; i<read_val.length; i++){
-        console.log(read_val.charCodeAt(i));
-        if(read_val.charCodeAt(i) == pin){
-            
-            value_dec = read_val.charCodeAt(i+1)+(read_val.charCodeAt(i+2)<<4);
-            break;
-        }
-    }
-    if(value_dec > 100){
-        let rv_temp;
-        rv_temp = await readLoop(2)
-    //console.log(read_val.charCodeAt(0) + " " + read_val.charCodeAt(1) + " " + read_val.charCodeAt(3)); //add check to validate port
-        for(let i=0; i<rv_temp.length; i++){
-        console.log(rv_temp.charCodeAt(i));
-        if(rv_temp.charCodeAt(i) == pin){
-            value_dec = rv_temp.charCodeAt(i+1)+(rv_temp.charCodeAt(i+2)<<4);
-            break;
-        }
-    }
-    }
-    console.log(value_dec);
+    value_dec = read_val.charCodeAt(read_val.length-3)+(read_val.charCodeAt(read_val.length-2)<<4);
+
+    
+    //console.log("temp:"+value_dec);
+    return value_dec;
+}
+
+async function humidity_read_fmt(pin) {
+    let arrays = new Uint8Array(5);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x11;
+    arrays[3] = pin;
+    arrays[4] = 0xF7;
+    writeToStream(arrays);
+    let read_val = await readLoop(2)
+    value_dec = read_val.charCodeAt(read_val.length-3)+(read_val.charCodeAt(read_val.length-2)<<4);
+    console.log("hum:"+value_dec);
     return value_dec;
 }
 
 async function readLoop(mode) { //0=normal reads | 1=digital read
-    console.log("reading");
+    //console.log("reading");
     let timeout_check_serial = Date.now();
     let val;
     while (true) {
         const { value, done } = await reader.read();
         //console.log(value);
-        console.log("initv:" + value);
-        console.log(value.length);
+        //console.log("initv:" + value);
+        //console.log(value.length);
         if (mode == 0) {
             if (value.length >= 2) {
                 val = value;
@@ -268,12 +276,19 @@ async function readLoop(mode) { //0=normal reads | 1=digital read
                 val = (value);
             }
         }else if (mode == 2) {
-            
+            if(val == null){
+                val = value;
+            }else{
+                val = val.concat(value);
+                if(val.charCodeAt(val.length-1) == 0xFFFD){
+                    break;
+                }
+            }
         }
 
 
     };
-    console.log("read_v:" + val);
+    //console.log("read_v:" + val);
     return val;
 }
 
