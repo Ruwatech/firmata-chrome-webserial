@@ -3,10 +3,10 @@ let pin_io_array = new Uint8Array(39);
 let pin_direction_array = new Uint8Array(39);
 
 const analogPinsESP32 = { "39": 0, "36": 1, "35": 2, "34": 3, "33": 4, "32": 5, "27": 6, "26": 7, "25": 8, "15": 9, "14": 10, "13": 11, "12": 12, "5": 13, "4": 14, "2": 15 };
-
+var read_vald;
 
 async function connect_serial() {
-    console.log("cgtn");
+    console.log("connecting...");
     //Optional filter to only see relevant boards
     const filter1 = {
         usbVendorId: 0x1A86 // CH340G
@@ -85,26 +85,162 @@ function digitalWrite_fmt(pin, state) {
     //readLoop();
 }
 
-function analog_write_fm(port, value) {
-    let ared_val = 0;
+async function digital_read_fmt(pin) {
+    //let flush_const = await flush_serial();
+    let arrays = new Uint8Array(5);
+    let port_pin = Math.floor(pin / 8);
+    let value_dec = 0;
+    arrays[0] = 0xF4;
+    arrays[1] = pin;
+    arrays[2] = 0x00;
+    arrays[3] = 0xD0 + port_pin;
+    arrays[4] = 0x01;
+    writeToStream(arrays);
+    let read_val = await readLoop(1)
+    console.log(read_val.charCodeAt(0) + " " + read_val.charCodeAt(1) + " " + read_val.charCodeAt(3)); //add check to validate port
+    for(let i=0; i<read_val.length; i++){
+        if(read_val.charCodeAt(i) == 65533){
+            value_dec = (read_val.charCodeAt(i+1)>>(pin-port_pin*8))&0b1;
+            break;
+        }
+    }
 
-    return
+   
+    
+    console.log(value_dec);
+    return value_dec;
 }
 
+
+function analog_write_fmt(pin, value) {
+    var arrays = new Uint8Array(9);
+    let port_pin = Math.floor(pin / 8);
+    arrays[0] = 0xF4;
+    arrays[1] = pin;
+    arrays[2] = 0x03;
+    pin_direction_array[pin] = 1;
+    arrays[3] = 0xF0;
+    arrays[4] = 0x6F;
+    pin_io_array[pin] = 1;
+    arrays[5] = pin;
+    arrays[6] = value;
+    arrays[7] = 0x00;
+    arrays[8] = 0xF7;
+    writeToStream(arrays);
+    //readLoop();
+}
+
+function buzzer_fmt(freq, duration){
+    var arrays = new Uint8Array(8);
+    //let port_pin = Math.floor(pin / 8);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x07;
+    arrays[3] = freq;
+    arrays[4] = 0x00;
+    arrays[5] = duration&0xFF;
+    arrays[6] = duration>>8;
+    arrays[7] = 0xF7;
+    writeToStream(arrays);
+    
+    
+}
+
+function display_text_fmt(text,text_size,xpos,ypos){
+    var arrays = new Uint8Array(8+text.length);
+    //let port_pin = Math.floor(pin / 8);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x01;
+    arrays[3] = xpos;
+    arrays[4] = ypos;
+    arrays[5] = 0x02;
+    arrays[6] = text.length;
+    for(let i=0; i<text.length; i++){
+        arrays[7+i] = text.charCodeAt(i);
+    }
+
+    arrays[7+text.length] = 0xF7;
+    writeToStream(arrays);
+}
+
+function display_clear_fmt(){
+    var arrays = new Uint8Array(4);
+    //let port_pin = Math.floor(pin / 8);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x02;
+    arrays[3] = 0xF7;
+    writeToStream(arrays);
+}
+
+
+
+function play_tone_fmt(note, beats){
+    var arrays = new Uint8Array(6);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x08;
+    arrays[3] = note;
+    arrays[4] = beats;
+    arrays[5] = 0xF7;
+    writeToStream(arrays);
+    
+}
+
+//f4 10 01 f0 6f 10 ff 00 f7   
+//f4 10 03 f0 6f 10 32 00 f7
+
 async function analog_read_fmt(pin) {
-    let arrays = new Uint8Array(6);
+    let arrays = new Uint8Array(5);
     let pin_s = analogPinsESP32[pin];
     arrays[0] = 0xF4;
     arrays[1] = pin_s;
     arrays[2] = 0x02;
-    arrays[3] = pin_s;
+    arrays[3] = 0xC0 + pin_s;
     arrays[4] = 0x01;
     writeToStream(arrays);
-    let read_val = await readLoop()
-    console.log(read_val.charCodeAt(1)+read_val.charCodeAt(2)<<7);
+    let read_val = await readLoop(0)
+    let value_dec = (read_val.charCodeAt(1)) + (read_val.charCodeAt(2) << 7);
+    console.log(value_dec);
+    return value_dec;
 }
 
-async function readLoop() {
+async function temperature_read_fmt(pin) {
+    let arrays = new Uint8Array(5);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x03;
+    arrays[3] = pin;
+    arrays[4] = 0xF7;
+    writeToStream(arrays);
+    let read_val = await readLoop(2)
+    //console.log(read_val.charCodeAt(0) + " " + read_val.charCodeAt(1) + " " + read_val.charCodeAt(3)); //add check to validate port
+    for(let i=0; i<read_val.length; i++){
+        console.log(read_val.charCodeAt(i));
+        if(read_val.charCodeAt(i) == pin){
+            
+            value_dec = read_val.charCodeAt(i+1)+(read_val.charCodeAt(i+2)<<4);
+            break;
+        }
+    }
+    if(value_dec > 100){
+        let rv_temp;
+        rv_temp = await readLoop(2)
+    //console.log(read_val.charCodeAt(0) + " " + read_val.charCodeAt(1) + " " + read_val.charCodeAt(3)); //add check to validate port
+        for(let i=0; i<rv_temp.length; i++){
+        console.log(rv_temp.charCodeAt(i));
+        if(rv_temp.charCodeAt(i) == pin){
+            value_dec = rv_temp.charCodeAt(i+1)+(rv_temp.charCodeAt(i+2)<<4);
+            break;
+        }
+    }
+    }
+    console.log(value_dec);
+    return value_dec;
+}
+
+async function readLoop(mode) { //0=normal reads | 1=digital read
     console.log("reading");
     let timeout_check_serial = Date.now();
     let val;
@@ -113,14 +249,35 @@ async function readLoop() {
         //console.log(value);
         console.log("initv:" + value);
         console.log(value.length);
-        if (value.length >= 2) {
-            val = value;
-            //reader.releaseLock();
-            break;
+        if (mode == 0) {
+            if (value.length >= 2) {
+                val = value;
+                //reader.releaseLock();
+                break;
+            }
+        } else if (mode == 1) {
+            if (value.length >= 2) {
+                if (val == null) {
+                    val = value;
+                } else {
+                    val = val.concat(value);
+                }
+                //reader.releaseLock();
+                break;
+            } else {
+                val = (value);
+            }
+        }else if (mode == 2) {
+            
         }
 
-        
+
     };
-   // console.log("read_v:" + val);
+    console.log("read_v:" + val);
     return val;
+}
+
+
+async function flush_serial(){
+    let temp = await readLoop(0);
 }
