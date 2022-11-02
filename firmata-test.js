@@ -218,6 +218,29 @@ async function analog_read_fmt(pin) {
     return value_dec;
 }
 
+async function touch_read_fmt(pin) {
+    let arrays = new Uint8Array(5);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x12;
+    arrays[3] = pin;
+    arrays[4] = 0xF7;
+    writeToStream(arrays);
+    let read_val = await readLoop(3)
+    /*
+    for (let i = 0; i < read_val.length; i++) {
+       console.log(read_val[i]);
+        
+    }
+    */
+    value_dec = read_val.charCodeAt(read_val.length-3)+(read_val.charCodeAt(read_val.length-2)<<4);
+
+    
+    console.log("touch:"+value_dec);
+    return value_dec;
+}
+
+
 async function temperature_read_fmt(pin) {
     let arrays = new Uint8Array(5);
     arrays[0] = 0xF0;
@@ -283,6 +306,25 @@ async function readLoop(mode) { //0=normal reads | 1=digital read
                 if(val.charCodeAt(val.length-1) == 0xFFFD){
                     break;
                 }
+            }
+        }else if (mode == 3) {
+            
+            if(val == null){
+                val = value;
+                //console.log(val);
+            }else{
+                
+                val = val.concat(value);
+                //console.log(val);
+                
+                if(val.includes(String.fromCharCode(0xFFFD))){
+                    break;
+                }
+            /*
+               if(val.length>=25){
+                break;
+               }
+            */
             }
         }
 
