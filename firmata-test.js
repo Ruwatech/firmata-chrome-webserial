@@ -236,7 +236,56 @@ async function touch_read_fmt(pin) {
     value_dec = read_val.charCodeAt(read_val.length-3)+(read_val.charCodeAt(read_val.length-2)<<4);
 
     
-    console.log("touch:"+value_dec);
+    //console.log("touch:"+value_dec);
+    return value_dec;
+}              
+
+
+function run_motor_fmt(motor, speed){
+
+}
+//    f0 02 05 05 07 02 f7                              ð.....÷          
+function draw_object_fmt(shape, xpos, ypos){
+    var arrays = new Uint8Array(7);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x05;
+    arrays[3] = xpos;
+    arrays[4] = ypos;
+    arrays[5] = shape;
+    arrays[6] = 0xF7;
+    writeToStream(arrays);
+}
+
+function set_object_size_fmt(size_s){
+    var arrays = new Uint8Array(5);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x06;
+    arrays[3] = size_s;
+    arrays[4] = 0xF7;
+    writeToStream(arrays);
+}
+
+async function sonar_read_fmt(pin) {
+    let arrays = new Uint8Array(5);
+    arrays[0] = 0xF0;
+    arrays[1] = 0x02;
+    arrays[2] = 0x10;
+    arrays[3] = pin;
+    arrays[4] = 0xF7;
+    writeToStream(arrays);
+    let read_val = await readLoop(3)
+    /*
+    for (let i = 0; i < read_val.length; i++) {
+       console.log(read_val[i]);
+        
+    }
+    */
+    value_dec = read_val.charCodeAt(read_val.length-3)+(read_val.charCodeAt(read_val.length-2)<<4);
+
+    
+    console.log("sonar:"+value_dec);
     return value_dec;
 }
 
